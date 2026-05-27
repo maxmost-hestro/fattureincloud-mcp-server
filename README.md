@@ -36,7 +36,7 @@ Questo MCP server si interpone tra il tuo assistente AI e le API, aggiungendo un
 
 ```
 fattureincloud-mcp-server/
-├── server.py              # Entry point — registra tutti i tools, supporta stdio + SSE
+├── server.py              # Entry point — registra tutti i tools, supporta stdio + SSE + streamable-http
 ├── auth_setup.py          # Wizard interattivo per setup OAuth2
 ├── src/
 │   ├── config.py          # Configurazione API (token OAuth2, company ID)
@@ -58,7 +58,8 @@ fattureincloud-mcp-server/
 | Modalita' | Caso d'uso | Comando |
 |---|---|---|
 | **stdio** (default) | Claude Code, Claude Desktop | `python server.py` |
-| **HTTP/SSE** | Deploy remoto, Docker | `python server.py --http --port 3002` |
+| **streamable-http** | claude.ai, deploy remoto (MCP 2025-03-26) | `python server.py --transport streamable-http --port 3002` |
+| **sse** | Legacy HTTP/SSE | `python server.py --transport sse --port 3002` |
 
 ---
 
@@ -182,8 +183,11 @@ cp .env.example .env
 # Modalita' stdio (per Claude Code / Claude Desktop)
 python server.py
 
-# Modalita' HTTP/SSE (per deploy remoto)
-python server.py --http --host 0.0.0.0 --port 3002
+# Streamable HTTP — richiesto da claude.ai (MCP spec 2025-03-26)
+python server.py --transport streamable-http --host 0.0.0.0 --port 3002
+
+# Legacy HTTP/SSE
+python server.py --transport sse --host 0.0.0.0 --port 3002
 ```
 
 ### 5. Collegamento a Claude Code
@@ -239,12 +243,15 @@ situation:r           # Lettura situazione contabile
 # Build
 docker build -t fattureincloud-mcp .
 
-# Run con env file
+# Run con streamable HTTP (default, per claude.ai)
 docker run -d \
   --name fattureincloud-mcp \
   -p 3002:3002 \
   --env-file .env \
-  fattureincloud-mcp python server.py --http
+  fattureincloud-mcp
+
+# Run con stdio (per Claude Code locale)
+docker run -i --rm --env-file .env fattureincloud-mcp python server.py
 ```
 
 ---

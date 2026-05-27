@@ -11,19 +11,22 @@ Architettura modulare con tools organizzati per categoria:
 - analytics: Report e statistiche
 - info: Informazioni aziendali
 
-Supports two transport modes:
+Supports three transport modes:
 - stdio: For local Claude Code/Desktop usage (default)
-- SSE: For remote deployment via HTTP (use --http flag)
+- sse: Legacy HTTP/SSE transport (GET /sse)
+- streamable-http: MCP spec 2025-03-26, required by claude.ai (POST /)
 """
 
 import asyncio
+import contextlib
 import logging
 import argparse
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
-from starlette.routing import Route
+from starlette.routing import Mount, Route
 import uvicorn
 
 # Import modular tools and handlers
@@ -100,6 +103,28 @@ async def run_stdio():
         )
 
 
+async def run_streamable_http(host: str = "0.0.0.0", port: int = 3002):
+    """Run the MCP server with streamable HTTP transport (MCP spec 2025-03-26)."""
+    logger.info(f"Starting FattureInCloud MCP Server in streamable HTTP mode on {host}:{port}...")
+    logger.info("Server ready. Registered 20 tools across 7 categories.")
+
+    session_manager = StreamableHTTPSessionManager(app=server, stateless=True)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app):
+        async with session_manager.run():
+            yield
+
+    starlette_app = Starlette(
+        routes=[Mount("/", app=session_manager.handle_request)],
+        lifespan=lifespan,
+    )
+
+    config = uvicorn.Config(starlette_app, host=host, port=port, log_level="info")
+    server_instance = uvicorn.Server(config)
+    await server_instance.serve()
+
+
 async def run_http(host: str = "0.0.0.0", port: int = 3002):
     """Run the MCP server in HTTP/SSE mode (for remote usage)."""
     logger.info(f"Starting FattureInCloud MCP Server in HTTP/SSE mode on {host}:{port}...")
@@ -144,29 +169,42 @@ async def run_http(host: str = "0.0.0.0", port: int = 3002):
 def main():
     """Main entry point with argument parsing."""
     parser = argparse.ArgumentParser(
-        description="FattureInCloud MCP Server - Supports stdio and HTTP/SSE transport"
+        description="FattureInCloud MCP Server"
+    )
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse", "streamable-http"],
+        default="stdio",
+        help="Transport mode: stdio (default), sse (legacy HTTP/SSE), streamable-http (MCP 2025-03-26)"
     )
     parser.add_argument(
         "--http",
         action="store_true",
-        help="Run in HTTP/SSE mode instead of stdio (for remote deployment)"
+        help="Deprecated: use --transport sse instead. Kept for backward compatibility."
     )
     parser.add_argument(
         "--host",
         default="0.0.0.0",
-        help="Host to bind to in HTTP mode (default: 0.0.0.0)"
+        help="Host to bind to in HTTP modes (default: 0.0.0.0)"
     )
     parser.add_argument(
         "--port",
         type=int,
         default=3002,
-        help="Port to bind to in HTTP mode (default: 3002)"
+        help="Port to bind to in HTTP modes (default: 3002)"
     )
 
     args = parser.parse_args()
 
+    # --http is a deprecated alias for --transport sse (backward compatibility)
+    if args.http:
+        logger.warning("--http is deprecated, use --transport sse instead")
+        args.transport = "sse"
+
     try:
-        if args.http:
+        if args.transport == "streamable-http":
+            asyncio.run(run_streamable_http(args.host, args.port))
+        elif args.transport == "sse":
             asyncio.run(run_http(args.host, args.port))
         else:
             asyncio.run(run_stdio())
