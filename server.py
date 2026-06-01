@@ -12,6 +12,8 @@ Architettura modulare con tools organizzati per categoria:
 - info: Informazioni aziendali
 - reminders: Solleciti e aging
 - products: Catalogo articoli / magazzino (read-only)
+- products_write: Scrittura magazzino (carico/scarico/categoria/anagrafica/create/delete, guarded)
+- quotes: Preventivi emessi (read-only)
 
 Supports three transport modes:
 - stdio: For local Claude Code/Desktop usage (default)
@@ -40,6 +42,8 @@ from src.tools.analytics import get_analytics_tools, get_analytics_handlers
 from src.tools.info import get_info_tools, get_info_handlers
 from src.tools.reminders import get_reminder_tools, get_reminder_handlers
 from src.tools.products import get_product_tools, get_product_handlers
+from src.tools.products_write import get_product_write_tools, get_product_write_handlers
+from src.tools.quotes import get_quote_tools, get_quote_handlers
 from mcp.types import Tool, TextContent
 
 # Configure logging
@@ -63,6 +67,8 @@ ALL_TOOLS.extend(get_analytics_tools())
 ALL_TOOLS.extend(get_info_tools())
 ALL_TOOLS.extend(get_reminder_tools())
 ALL_TOOLS.extend(get_product_tools())
+ALL_TOOLS.extend(get_product_write_tools())
+ALL_TOOLS.extend(get_quote_tools())
 
 # Collect all handlers from modules
 logger.info("Collecting handlers from all modules...")
@@ -75,6 +81,8 @@ ALL_HANDLERS.update(get_analytics_handlers())
 ALL_HANDLERS.update(get_info_handlers())
 ALL_HANDLERS.update(get_reminder_handlers())
 ALL_HANDLERS.update(get_product_handlers())
+ALL_HANDLERS.update(get_product_write_handlers())
+ALL_HANDLERS.update(get_quote_handlers())
 
 logger.info(f"Registered {len(ALL_TOOLS)} tools: {list(ALL_HANDLERS.keys())}")
 
@@ -98,7 +106,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 async def run_stdio():
     """Run the MCP server in stdio mode (for local usage)."""
     logger.info("Starting FattureInCloud MCP Server in STDIO mode...")
-    logger.info("Server ready. Registered 22 tools across 8 categories.")
+    logger.info("Server ready. Registered 28 tools across 10 categories.")
 
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
@@ -111,7 +119,7 @@ async def run_stdio():
 async def run_streamable_http(host: str = "0.0.0.0", port: int = 3002):
     """Run the MCP server with streamable HTTP transport (MCP spec 2025-03-26)."""
     logger.info(f"Starting FattureInCloud MCP Server in streamable HTTP mode on {host}:{port}...")
-    logger.info("Server ready. Registered 22 tools across 8 categories.")
+    logger.info("Server ready. Registered 28 tools across 10 categories.")
 
     session_manager = StreamableHTTPSessionManager(app=server, stateless=True)
 
@@ -133,7 +141,7 @@ async def run_streamable_http(host: str = "0.0.0.0", port: int = 3002):
 async def run_http(host: str = "0.0.0.0", port: int = 3002):
     """Run the MCP server in HTTP/SSE mode (for remote usage)."""
     logger.info(f"Starting FattureInCloud MCP Server in HTTP/SSE mode on {host}:{port}...")
-    logger.info("Server ready. Registered 22 tools across 8 categories.")
+    logger.info("Server ready. Registered 28 tools across 10 categories.")
 
     sse = SseServerTransport("/messages")
 

@@ -5,7 +5,7 @@
 
 Un server [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) completo che collega assistenti AI come Claude alla piattaforma di fatturazione [Fatture in Cloud](https://www.fattureincloud.it/).
 
-**22 tools** organizzati in 8 categorie che vanno ben oltre il semplice wrapping delle API — aggiungendo paginazione automatica, netting delle note di credito, analisi aging, scoring comportamento pagamenti, dati strutturati per i workflow di sollecito e lettura del catalogo articoli / magazzino per la valorizzazione delle rimanenze.
+**28 tools** organizzati in 10 categorie che vanno ben oltre il semplice wrapping delle API: paginazione automatica, netting delle note di credito, analisi aging, scoring comportamento pagamenti, dati strutturati per i workflow di sollecito, lettura del catalogo articoli / magazzino per la valorizzazione delle rimanenze, scrittura magazzino protetta da guardrail (carico/scarico/categoria/anagrafica) e lettura dedicata dei preventivi.
 
 ---
 
@@ -49,7 +49,9 @@ fattureincloud-mcp-server/
 │       ├── analytics.py   # Statistiche e report fatturato (3 tools)
 │       ├── info.py        # Informazioni azienda (1 tool)
 │       ├── reminders.py   # Solleciti e analisi crediti (5 tools)
-│       └── products.py    # Catalogo articoli / magazzino (2 tools, read-only)
+│       ├── products.py    # Catalogo articoli / magazzino (2 tools, read-only)
+│       ├── products_write.py # Scrittura magazzino (5 tools, guarded)
+│       └── quotes.py      # Preventivi emessi (1 tool, read-only)
 ├── Dockerfile             # Container per deploy remoto
 └── requirements.txt       # Dipendenze Python
 ```
@@ -131,6 +133,32 @@ Lettura del catalogo articoli per la valorizzazione delle rimanenze di magazzino
 |---|---|
 | `get_products` | Catalogo articoli con categoria, unita' di misura, costo unitario (`net_cost`/`average_cost`), giacenza (`stock_initial`/`stock_current`), prezzo e note. Filtri opzionali: `category`, `search`, `in_stock_only`, `limit`. In testa un riepilogo per categoria con valore giacenza = `sum(stock_current * net_cost)`. |
 | `get_product_categories` | Elenco delle categorie magazzino (tassonomia ufficiale FIC, `context="products"`) arricchito con conteggio articoli e valore giacenza per categoria. |
+
+### Scrittura magazzino (5 tools, guarded)
+
+Operazioni di SCRITTURA sugli articoli (carico/scarico, categoria, anagrafica, create/delete), pensate per lo step carico/scarico di `prep-bilancio`. FIC non ha movimenti di magazzino giornalizzati: carico/scarico/rettifica sono realizzati come read-modify-write della giacenza.
+
+**Doppia barriera di sicurezza:**
+1. Env flag globale **`FIC_ALLOW_WRITE`** (default off): se diverso da `true`, ogni scrittura e' rifiutata. Va aggiunto (`-e FIC_ALLOW_WRITE=true`) SOLO ai profili che devono scrivere.
+2. Parametro **`confirm`** per ogni tool: senza `confirm=true` il tool esegue un **dry-run** con anteprima `prima -> dopo`, senza scrivere.
+
+Scarico bloccato sotto zero, ogni scrittura loggata, una scrittura per chiamata (nessun batch).
+
+| Tool | Descrizione |
+|---|---|
+| `product_update_stock` | Carico / scarico / rettifica giacenza (`operation`: `set`/`carico`/`scarico`). |
+| `product_update_category` | Cambia la categoria di un articolo. |
+| `product_update_fields` | Modifica `net_cost`, `net_price`, `name`, `code`, `measure`, `notes`. |
+| `product_create` | Crea un nuovo articolo. |
+| `product_delete` | Cancella un articolo (FIC rifiuta se usato in documenti). |
+
+> Nota (2026-06-01): la scrittura non e' ancora abilitabile in produzione. Il token OAuth corrente e' read-only e FIC risponde `403 NO_PERMISSION`. Per abilitarla servono lo scope `products:a` in `auth_setup.py` e una ri-autorizzazione del token. Il campo giacenza usato (`stock_initial`) andra' poi confermato con un test su articolo non critico.
+
+### Preventivi (1 tool, read-only)
+
+| Tool | Descrizione |
+|---|---|
+| `get_quotes` | Elenco preventivi emessi (`type="quote"`): numero, data, cliente, oggetto, validita' (`next_due_date`), data "visto" (`seen_date`), importi e link PDF. Filtri: `from_date`, `to_date`, `client_name`, `limit`. Tool dedicato perche' `get_invoices` mescola i preventivi con gli altri documenti emessi. |
 
 ### Netting Note di Credito — Come funziona
 
