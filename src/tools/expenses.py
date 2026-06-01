@@ -316,6 +316,186 @@ async def handle_get_received_invoice(arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=f"Errore: {str(e)}")]
 
 
+async def handle_get_received_credit_notes(arguments: dict) -> list[TextContent]:
+    """Note di credito ricevute dai fornitori (passive_credit_note).
+
+    Gemello di handle_get_received_invoices: cambia solo il tipo documento e le
+    etichette, e include SEMPRE descrizione e righe di dettaglio per il matching
+    con le fatture originali (es. esclusione cespiti stornati da NC)."""
+    from_date = arguments.get("from_date")
+    to_date = arguments.get("to_date")
+    supplier_name = arguments.get("supplier_name")
+    limit = arguments.get("limit", 50)
+
+    with get_api_client() as api_client:
+        api = received_documents_api.ReceivedDocumentsApi(api_client)
+
+        try:
+            if not to_date:
+                to_date = datetime.now().strftime("%Y-%m-%d")
+            if not from_date:
+                from_date = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+
+            # Se c'è un filtro fornitore e il periodo è > 120 giorni,
+            # faccio query mese per mese per recuperare tutte le note di credito
+            from_dt = datetime.strptime(from_date, "%Y-%m-%d")
+            to_dt = datetime.strptime(to_date, "%Y-%m-%d")
+            days_diff = (to_dt - from_dt).days
+
+            all_expenses = []
+
+            if supplier_name and days_diff > 120:
+                # Query mese per mese CON PAGINAZIONE
+                current_date = from_dt
+                while current_date <= to_dt:
+                    # Primo e ultimo giorno del mese
+                    first_day = current_date.replace(day=1)
+                    # Ultimo giorno del mese
+                    if current_date.month == 12:
+                        last_day = current_date.replace(day=31)
+                    else:
+                        next_month = current_date.replace(month=current_date.month + 1, day=1)
+                        last_day = next_month - timedelta(days=1)
+
+                    # Non superare to_date
+                    if last_day > to_dt:
+                        last_day = to_dt
+
+                    q = f"date >= '{first_day.strftime('%Y-%m-%d')}' and date <= '{last_day.strftime('%Y-%m-%d')}'"
+
+                    # Loop paginazione per questo mese
+                    page = 1
+                    while True:
+                        response = api.list_received_documents(
+                            company_id=COMPANY_ID,
+                            type="passive_credit_note",
+                            q=q,
+                            page=page,
+                            per_page=100,
+                            fieldset="detailed"
+                        )
+
+                        if response.data:
+                            all_expenses.extend(response.data)
+
+                        # Verifica se ci sono altre pagine
+                        if page >= response.last_page:
+                            break
+
+                        page += 1
+
+                    # Prossimo mese
+                    if current_date.month == 12:
+                        current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
+                    else:
+                        current_date = current_date.replace(month=current_date.month + 1, day=1)
+            else:
+                # Query singola CON PAGINAZIONE
+                q = f"date >= '{from_date}' and date <= '{to_date}'"
+
+                # Loop paginazione
+                page = 1
+                while True:
+                    response = api.list_received_documents(
+                        company_id=COMPANY_ID,
+                        type="passive_credit_note",
+                        q=q,
+                        page=page,
+                        per_page=100,
+                        fieldset="detailed"
+                    )
+
+                    if response.data:
+                        all_expenses.extend(response.data)
+
+                    # Verifica se ci sono altre pagine
+                    if page >= response.last_page:
+                        break
+
+                    page += 1
+
+            # Filtro per fornitore in Python (case-insensitive, partial match)
+            if supplier_name:
+                expenses = [
+                    exp for exp in all_expenses
+                    if exp.entity and supplier_name.lower() in exp.entity.name.lower()
+                ]
+                # Limito ai primi N risultati
+                expenses = expenses[:limit]
+            else:
+                expenses = all_expenses[:limit]
+
+            if not expenses:
+                output = "Nessuna nota di credito ricevuta trovata."
+            else:
+                total_net = sum(exp.amount_net or 0 for exp in expenses)
+                total_vat = sum(exp.amount_vat or 0 for exp in expenses)
+                total_gross = sum(exp.amount_gross or 0 for exp in expenses)
+                output = f"Trovate {len(expenses)} note di credito ricevute:\n"
+                output += f"  Imponibile totale: {total_net:.2f} EUR\n"
+                output += f"  IVA totale: {total_vat:.2f} EUR\n"
+                output += f"  Totale: {total_gross:.2f} EUR\n\n"
+
+                for exp in expenses:
+                    doc_id = exp.id or 'N/A'
+                    doc_date = exp.var_date.strftime("%Y-%m-%d") if exp.var_date else 'N/A'
+                    output += f"- ID {doc_id} del {doc_date}\n"
+
+                    # Fornitore con dettagli
+                    if exp.entity:
+                        output += f"  Fornitore: {exp.entity.name}\n"
+                        if exp.entity.vat_number:
+                            output += f"  P.IVA: {exp.entity.vat_number}\n"
+                        if exp.entity.tax_code and exp.entity.tax_code != exp.entity.vat_number:
+                            output += f"  C.F.: {exp.entity.tax_code}\n"
+                    else:
+                        output += f"  Fornitore: N/A\n"
+
+                    # Numero documento fornitore
+                    if exp.invoice_number:
+                        output += f"  N. documento: {exp.invoice_number}\n"
+
+                    # Importi
+                    output += f"  Imponibile: {exp.amount_net or 0:.2f} EUR\n"
+                    output += f"  IVA: {exp.amount_vat or 0:.2f} EUR\n"
+                    output += f"  Totale: {exp.amount_gross or 0:.2f} EUR\n"
+
+                    # Categoria e centro di costo
+                    if exp.category:
+                        output += f"  Categoria: {exp.category}\n"
+                    if exp.rc_center:
+                        output += f"  Centro di costo: {exp.rc_center}\n"
+
+                    # E-invoice
+                    if exp.e_invoice:
+                        output += f"  Fattura elettronica: Sì\n"
+
+                    # Descrizione - SEMPRE presente, non troncata (serve per il matching)
+                    if hasattr(exp, 'description') and exp.description:
+                        output += f"  Descrizione: {exp.description}\n"
+
+                    # Righe di dettaglio - SEMPRE presenti (servono per il matching)
+                    if exp.items_list and len(exp.items_list) > 0:
+                        output += f"  RIGHE DI DETTAGLIO:\n"
+                        for item in exp.items_list:
+                            output += f"  - {item.name}\n"
+                            if item.qty and item.qty != 1:
+                                output += f"    Quantità: {item.qty}"
+                                if item.measure:
+                                    output += f" {item.measure}"
+                                output += "\n"
+                            output += f"    Importo: {item.net_price:.2f} EUR\n"
+                            if item.vat and item.vat.value:
+                                output += f"    IVA: {item.vat.value}%\n"
+
+                    output += "\n"
+
+            return [TextContent(type="text", text=output)]
+
+        except Exception as e:
+            return [TextContent(type="text", text=f"Errore: {str(e)}")]
+
+
 async def handle_get_unpaid_received_invoices(arguments: dict) -> list[TextContent]:
     """Fatture ricevute non ancora pagate (da pagare)."""
     limit = arguments.get("limit", 100)
@@ -521,6 +701,31 @@ def get_expense_tools():
         }
         ),
         Tool(
+            name="get_received_credit_notes",
+            description="Note di credito ricevute dai fornitori (passive_credit_note). Usato per verificare storni/resi su fatture passive (es. controllo cespiti). Include descrizione e righe di dettaglio per il matching con le fatture originali.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "from_date": {
+                        "type": "string",
+                        "description": "Data inizio (YYYY-MM-DD), default: ultimi 90 giorni"
+                    },
+                    "to_date": {
+                        "type": "string",
+                        "description": "Data fine (YYYY-MM-DD), default: oggi"
+                    },
+                    "supplier_name": {
+                        "type": "string",
+                        "description": "Filtra per nome fornitore (ricerca parziale)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Numero massimo risultati, default: 50"
+                    }
+                }
+            }
+        ),
+        Tool(
             name="get_received_invoice",
             description="Dettaglio completo di una fattura ricevuta",
             inputSchema={
@@ -571,6 +776,7 @@ def get_expense_handlers():
     """Restituisce il dizionario di handler per spese."""
     return {
         "get_received_invoices": handle_get_received_invoices,
+        "get_received_credit_notes": handle_get_received_credit_notes,
         "get_received_invoice": handle_get_received_invoice,
         "get_unpaid_received_invoices": handle_get_unpaid_received_invoices,
         "get_expenses_by_month": handle_get_expenses_by_month,

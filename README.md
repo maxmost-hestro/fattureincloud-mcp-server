@@ -45,7 +45,7 @@ fattureincloud-mcp-server/
 │       ├── invoices.py    # Documenti emessi (2 tools)
 │       ├── payments.py    # Pagamenti e scadenze (2 tools)
 │       ├── clients.py     # Gestione clienti (2 tools)
-│       ├── expenses.py    # Documenti ricevuti e spese (4 tools)
+│       ├── expenses.py    # Documenti ricevuti e spese (5 tools)
 │       ├── analytics.py   # Statistiche e report fatturato (3 tools)
 │       ├── info.py        # Informazioni azienda (1 tool)
 │       └── reminders.py   # Solleciti e analisi crediti (5 tools)
@@ -86,11 +86,12 @@ fattureincloud-mcp-server/
 | `get_clients` | Anagrafica clienti completa: dati fiscali, indirizzi, contatti, PEC, codice SDI, condizioni di pagamento predefinite. |
 | `get_client_invoices` | Tutte le fatture per un cliente specifico con riepilogo pagamenti. |
 
-### Spese (4 tools)
+### Spese (5 tools)
 
 | Tool | Descrizione |
 |---|---|
 | `get_received_invoices` | Fatture ricevute da fornitori con paginazione intelligente (mese per mese per intervalli lunghi). |
+| `get_received_credit_notes` | Note di credito ricevute dai fornitori (`passive_credit_note`), con la stessa paginazione intelligente. Include sempre descrizione completa e righe di dettaglio per il matching con le fatture originali (es. esclusione di cespiti stornati da resi/errori). |
 | `get_received_invoice` | Dettaglio completo di una fattura ricevuta: righe, deducibilita', piano pagamenti. |
 | `get_unpaid_received_invoices` | Fatture passive non ancora pagate — la tua dashboard debiti verso fornitori. |
 | `get_expenses_by_month` | Aggregazione spese mensili per qualsiasi anno, con totali e medie. |

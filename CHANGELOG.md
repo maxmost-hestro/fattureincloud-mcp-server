@@ -5,6 +5,13 @@ Tutte le modifiche rilevanti a questo progetto sono documentate in questo file.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.0.0/)
 e il progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.1.0] - 2026-06-01
+
+### Added
+- **`get_received_credit_notes`**: nuovo tool per le note di credito PASSIVE ricevute dai fornitori (tipo documento `passive_credit_note`). Gemello di `get_received_invoices` (stessa paginazione intelligente, filtro fornitore e formato output), include sempre descrizione completa e righe di dettaglio per consentire il matching con le fatture originali. Pensato per il progetto `prep-bilancio`: verifica degli storni su fatture passive (resi, errori, difettosita) ed esclusione dei relativi cespiti. Totale tool: **20**.
+
+[1.1.0]: https://github.com/maxmost-hestro/fattureincloud-mcp-server/compare/v1.0.0...v1.1.0
+
 ## [1.0.0] - 2026-03-14
 
 ### Added
