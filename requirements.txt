@@ -1,6 +1,6 @@
 # FattureInCloud MCP Server - Python Dependencies
-# SDK ufficiale Fatture in Cloud (verificato 2026-01-14)
-fattureincloud-python-sdk==2.1.3
+# SDK ufficiale Fatture in Cloud (aggiornato 2026-06-01)
+fattureincloud-python-sdk==2.1.5
 
 # MCP SDK Ufficiale (Anthropic)
 mcp
