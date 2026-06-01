@@ -5,7 +5,7 @@
 
 Un server [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) completo che collega assistenti AI come Claude alla piattaforma di fatturazione [Fatture in Cloud](https://www.fattureincloud.it/).
 
-**20 tools** organizzati in 7 categorie che vanno ben oltre il semplice wrapping delle API — aggiungendo paginazione automatica, netting delle note di credito, analisi aging, scoring comportamento pagamenti e dati strutturati per i workflow di sollecito.
+**22 tools** organizzati in 8 categorie che vanno ben oltre il semplice wrapping delle API — aggiungendo paginazione automatica, netting delle note di credito, analisi aging, scoring comportamento pagamenti, dati strutturati per i workflow di sollecito e lettura del catalogo articoli / magazzino per la valorizzazione delle rimanenze.
 
 ---
 
@@ -48,7 +48,8 @@ fattureincloud-mcp-server/
 │       ├── expenses.py    # Documenti ricevuti e spese (5 tools)
 │       ├── analytics.py   # Statistiche e report fatturato (3 tools)
 │       ├── info.py        # Informazioni azienda (1 tool)
-│       └── reminders.py   # Solleciti e analisi crediti (5 tools)
+│       ├── reminders.py   # Solleciti e analisi crediti (5 tools)
+│       └── products.py    # Catalogo articoli / magazzino (2 tools, read-only)
 ├── Dockerfile             # Container per deploy remoto
 └── requirements.txt       # Dipendenze Python
 ```
@@ -121,6 +122,15 @@ Qui sta il vero valore aggiunto. Questi tools implementano logica di business ch
 | `get_reminder_data` | Dati strutturati per generare lettere di sollecito: anagrafica completa del cliente (nome, PEC, email, telefono, indirizzo) + tutte le fatture scadute con importi e giorni di ritardo. |
 | `get_client_payment_behavior` | Analisi affidabilita' pagamenti su 3 anni: DSO (Days Sales Outstanding), % pagamenti in ritardo, trend anno su anno (migliora/peggiora/stabile) e rating da 1 a 5 stelle. |
 | `get_reminder_priority_queue` | Lista prioritizzata dei clienti da sollecitare, con score: `importo * log(giorni_ritardo) * sqrt(num_fatture)`. Include livello urgenza (critico/alto/medio/basso) e contatti. |
+
+### Catalogo articoli / magazzino (2 tools, read-only)
+
+Lettura del catalogo articoli per la valorizzazione delle rimanenze di magazzino. Nessuna scrittura su FIC.
+
+| Tool | Descrizione |
+|---|---|
+| `get_products` | Catalogo articoli con categoria, unita' di misura, costo unitario (`net_cost`/`average_cost`), giacenza (`stock_initial`/`stock_current`), prezzo e note. Filtri opzionali: `category`, `search`, `in_stock_only`, `limit`. In testa un riepilogo per categoria con valore giacenza = `sum(stock_current * net_cost)`. |
+| `get_product_categories` | Elenco delle categorie magazzino (tassonomia ufficiale FIC, `context="products"`) arricchito con conteggio articoli e valore giacenza per categoria. |
 
 ### Netting Note di Credito — Come funziona
 

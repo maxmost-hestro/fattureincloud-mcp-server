@@ -5,6 +5,13 @@ Tutte le modifiche rilevanti a questo progetto sono documentate in questo file.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.0.0/)
 e il progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.2.0] - 2026-06-01
+
+### Added
+- **`get_products`** e **`get_product_categories`**: nuovo modulo `products.py` con due tool **read-only** per il catalogo articoli / magazzino (SDK `ProductsApi.list_products` + `InfoApi.list_product_categories` con `context="products"`). Per ogni articolo: categoria, unita' di misura, costo unitario (`net_cost`/`average_cost`), giacenza (`stock_initial`/`stock_current`), prezzo; riepilogo per categoria con valore giacenza = `sum(stock_current * net_cost)`. Nessuna scrittura su FIC. Pensati per il progetto `prep-bilancio`: valorizzazione delle rimanenze di magazzino al 31/12. Totale tool: **22** (8 categorie).
+
+[1.2.0]: https://github.com/maxmost-hestro/fattureincloud-mcp-server/compare/v1.1.0...v1.2.0
+
 ## [1.1.0] - 2026-06-01
 
 ### Added
