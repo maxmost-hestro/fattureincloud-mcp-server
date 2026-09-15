@@ -5,6 +5,22 @@ Tutte le modifiche rilevanti a questo progetto sono documentate in questo file.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.0.0/)
 e il progetto aderisce al [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.4.0] - 2026-09-16
+
+### Added
+- **Modulo `cashbook.py`** con 3 tool **read-only** per quadrare i flussi di cassa reali con fatture e costi del personale (progetto `amministrazione`, cash flow previsionale):
+  - `get_payment_accounts`: conti di pagamento (conti correnti, carte, cassa) con ID e IBAN (`InfoApi.list_payment_accounts`).
+  - `get_cashbook_entries`: prima nota per periodo (`CashbookApi.list_cashbook_entries`), con riepilogo per tipo di movimento (`kind`: fattura emessa/ricevuta, F24, ricevuta, manuale) e per conto, piu' dettaglio ordinato per data. Filtri: `from_date`, `to_date`, `type` (in/out/all), `payment_account_id`, `limit`.
+  - `get_f24_list`: elenco F24 registrati (importo, scadenza, stato, conto, totale per mese). Implementato con chiamata REST grezza a `/c/{company_id}/taxes` perche' il modello SDK `ListF24ResponseAggregatedData` (SDK 2.1.5) fallisce la validazione pydantic sulla risposta reale.
+- **Scope OAuth**: `auth_setup.py` richiede ora anche `cashbook:r` e `taxes:r`. **Il token di produzione attuale non li ha**: `get_cashbook_entries` risponde 403 NO_PERMISSION finche' non si riesegue `auth_setup.py` e si aggiorna `FIC_ACCESS_TOKEN` (nel `.env` del server e nel profilo MCP `AMM`). `get_f24_list` funziona gia' con il token attuale (verificato 2026-09-16: 19 F24 in archivio, registrati solo a spot).
+
+Totale tool: **31** (11 categorie).
+
+### Changed
+- **`requirements.txt`: `mcp` pinnato a `1.27.2`** (la versione dell'immagine Docker in produzione fino a oggi). Senza pin la rebuild del 2026-09-16 ha installato `mcp 2.2.0`, che ha cambiato l'API di `Server` (`list_tools`/`call_tool` non esistono piu' come decoratori) e mandava in errore l'avvio del server. Il pin ripristina la versione precedente; l'aggiornamento a mcp 2.x va fatto come attivita' separata e concordata. Le altre dipendenze non pinnate (starlette 1.6.0, uvicorn 0.53.0, pydantic 2.13.5, anyio 4.15.1) sono salite di minor/patch rispetto all'immagine precedente (1.3.1, 0.49.0, 2.13.4, 4.14.0): collaudati `get_aging_report`, `get_company_info` e i 3 tool nuovi sulla nuova immagine.
+
+[1.4.0]: https://github.com/maxmost-hestro/fattureincloud-mcp-server/compare/v1.3.0...v1.4.0
+
 ## [1.3.0] - 2026-06-01
 
 ### Added

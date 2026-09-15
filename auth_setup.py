@@ -26,6 +26,8 @@ SCOPES = [
     "entities:r",            # Lettura clienti/fornitori
     "settings:r",            # Lettura impostazioni
     "situation:r",           # Situazione contabile
+    "cashbook:r",            # Prima nota (get_cashbook_entries) - aggiunto 2026-09-16
+    "taxes:r",               # F24 (get_f24_list) - aggiunto 2026-09-16
 ]
 
 

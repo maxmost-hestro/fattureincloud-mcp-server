@@ -3,7 +3,7 @@
 fattureincloud-python-sdk==2.1.5
 
 # MCP SDK Ufficiale (Anthropic)
-mcp
+mcp==1.27.2  # pinnato 2026-09-16: senza pin la rebuild prendeva mcp 2.2.0 (API Server incompatibile)
 
 # Environment variables
 python-dotenv==1.0.1

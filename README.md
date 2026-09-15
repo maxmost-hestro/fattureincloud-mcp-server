@@ -5,7 +5,7 @@
 
 Un server [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) completo che collega assistenti AI come Claude alla piattaforma di fatturazione [Fatture in Cloud](https://www.fattureincloud.it/).
 
-**28 tools** organizzati in 10 categorie che vanno ben oltre il semplice wrapping delle API: paginazione automatica, netting delle note di credito, analisi aging, scoring comportamento pagamenti, dati strutturati per i workflow di sollecito, lettura del catalogo articoli / magazzino per la valorizzazione delle rimanenze, scrittura magazzino protetta da guardrail (carico/scarico/categoria/anagrafica) e lettura dedicata dei preventivi.
+**31 tools** organizzati in 11 categorie che vanno ben oltre il semplice wrapping delle API: paginazione automatica, netting delle note di credito, analisi aging, scoring comportamento pagamenti, dati strutturati per i workflow di sollecito, lettura del catalogo articoli / magazzino per la valorizzazione delle rimanenze, scrittura magazzino protetta da guardrail (carico/scarico/categoria/anagrafica) e lettura dedicata dei preventivi, prima nota e F24 per la quadratura di cassa.
 
 ---
 
@@ -51,7 +51,8 @@ fattureincloud-mcp-server/
 │       ├── reminders.py   # Solleciti e analisi crediti (5 tools)
 │       ├── products.py    # Catalogo articoli / magazzino (2 tools, read-only)
 │       ├── products_write.py # Scrittura magazzino (5 tools, guarded)
-│       └── quotes.py      # Preventivi emessi (1 tool, read-only)
+│       ├── quotes.py      # Preventivi emessi (1 tool, read-only)
+│       └── cashbook.py    # Prima nota, conti di pagamento, F24 (3 tools, read-only)
 ├── Dockerfile             # Container per deploy remoto
 └── requirements.txt       # Dipendenze Python
 ```
@@ -66,7 +67,7 @@ fattureincloud-mcp-server/
 
 ---
 
-## Riferimento Tools (20 totali)
+## Riferimento Tools (31 totali)
 
 ### Fatture emesse (2 tools)
 
@@ -159,6 +160,16 @@ Scarico bloccato sotto zero, ogni scrittura loggata, una scrittura per chiamata 
 | Tool | Descrizione |
 |---|---|
 | `get_quotes` | Elenco preventivi emessi (`type="quote"`): numero, data, cliente, oggetto, validita' (`next_due_date`), data "visto" (`seen_date`), importi e link PDF. Filtri: `from_date`, `to_date`, `client_name`, `limit`. Tool dedicato perche' `get_invoices` mescola i preventivi con gli altri documenti emessi. |
+
+### Prima nota, conti e F24 (3 tools, read-only)
+
+| Tool | Descrizione |
+|---|---|
+| `get_payment_accounts` | Conti di pagamento configurati (conti correnti, carte, cassa) con ID e IBAN. |
+| `get_cashbook_entries` | Prima nota per periodo: movimenti con riepilogo per tipo (`kind`: fattura emessa/ricevuta, F24, ricevuta, manuale) e per conto, piu' dettaglio ordinato per data. Filtri: `from_date`, `to_date`, `type` (in/out/all), `payment_account_id`, `limit`. Serve a quadrare i flussi di cassa reali con fatture e costi del personale. Richiede scope `cashbook:r`. |
+| `get_f24_list` | F24 registrati: importo, scadenza, stato, conto e totale per mese. Usa la REST diretta (`/c/{company_id}/taxes`) perche' il modello SDK non deserializza la risposta. Richiede scope `taxes:r`. |
+
+> Nota (2026-09-16): il token OAuth di produzione non ha ancora lo scope `cashbook:r`: `get_cashbook_entries` risponde `403 NO_PERMISSION` finche' non si riesegue `auth_setup.py` (che ora include `cashbook:r` e `taxes:r`) e si aggiorna `FIC_ACCESS_TOKEN`.
 
 ### Netting Note di Credito — Come funziona
 
@@ -272,6 +283,8 @@ received_documents:r  # Lettura fatture ricevute
 entities:r            # Lettura clienti/fornitori
 settings:r            # Lettura impostazioni
 situation:r           # Lettura situazione contabile
+cashbook:r            # Prima nota (get_cashbook_entries) - dal 2026-09-16
+taxes:r               # F24 (get_f24_list) - dal 2026-09-16
 ```
 
 ---
