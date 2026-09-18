@@ -190,8 +190,9 @@ async def handle_get_f24_list(arguments: dict) -> list[TextContent]:
         pa = (r.get("payment_account") or {}).get("name", "")
         output += (f"- {r.get('due_date')} | {r.get('status', '-'):8} | {_fmt(r.get('amount')):>12} EUR | "
                    f"{(r.get('description') or '')[:70]} | {pa}\n")
-    output += ("\nNota: in Fatture in Cloud gli F24 risultano registrati solo a spot (non ogni mese). "
-               "Per la quadratura mensile del personale usare i prospetti Centro Paghe.\n")
+    output += ("\nNota: la data e' quella di registrazione; la data di versamento reale e' nella causale (DATA INCASSO). "
+               "Un F24 puo' contenere anche imposte non di personale (IVA, ritenute professionisti): per la quadratura "
+               "mensile del personale confrontare con i prospetti Centro Paghe.\n")
     return [TextContent(type="text", text=output)]
 
 
